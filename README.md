@@ -13,18 +13,19 @@ groups, this bot is not finished yet, but it is functional.
 ## How to use
 1. Clone this repository
 2. Install the dependencies
-3. Build the project
+3. Edit the ./utils/getGroupsToSend.go file and add the groups you want to send messages to
+4. Build the project
     ````shell
     go build wabot
    ````
-4. Install the binary
+5. Install the binary
     ````shell
    go install wabot
    ````
    
-5. Run the binary
+6. Run the binary
     ````shell
     wabot
     ````
-6. Select your option
-7. Enjoy!
+7. Select your option
+8. Enjoy!
