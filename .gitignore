@@ -1,2 +1,3 @@
 /wabot.exe
 /.idea/*
+/utils/getGroupsToSend.go
