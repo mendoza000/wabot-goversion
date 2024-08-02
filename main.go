@@ -1,134 +1,63 @@
 package main
 
 import (
-	"context"
 	_ "embed"
+	"flag"
 	"fmt"
 	"github.com/fatih/color"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/mymmsc/gox/qrterminal"
-	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/store/sqlstore"
-	waLog "go.mau.fi/whatsmeow/util/log"
 	"os"
-	"os/exec"
-	"os/signal"
-	"path/filepath"
-	"syscall"
-	"wabot/utils"
+	"wabot/pkgs/client"
+	"wabot/pkgs/utils"
 )
 
-func connectClient(opt int) {
-	dbLog := waLog.Stdout("Database", "INFO", true)
-
-	wabotFolderPath := utils.FolderPath()
-	if wabotFolderPath == "" {
-		panic("Error al obtener la ruta de la carpeta wabot")
-	}
-
-	utils.VerifyImage()
-
-	dbPath := wabotFolderPath + "/data.db"
-	dbPath = "file:" + filepath.ToSlash(dbPath) + "?_foreign_keys=on"
-
-	container, err := sqlstore.New("sqlite3", dbPath, dbLog)
-	if err != nil {
-		panic(err)
-	}
-	// If you want multiple sessions, remember their JIDs and use .GetDevice(jid) or .GetAllDevices() instead.
-	deviceStore, err := container.GetFirstDevice()
-	if err != nil {
-		panic(err)
-	}
-	clientLog := waLog.Stdout("Client", "INFO", true)
-	client := whatsmeow.NewClient(deviceStore, clientLog)
-
-	if client.Store.ID == nil {
-		qrChan, _ := client.GetQRChannel(context.Background())
-		err = client.Connect()
-		if err != nil {
-			panic(err)
-		}
-		for evt := range qrChan {
-			if evt.Event == "code" {
-				fmt.Println("Scan this QR code with your phone:")
-				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-			} else {
-				fmt.Println("Login event:", evt.Event)
-			}
-		}
-	} else {
-		err = client.Connect()
-		if err != nil {
-			panic(err)
-		}
-		c := color.New(color.FgHiBlack, color.Bold).Add(color.BgWhite).SprintFunc()
-		green := color.New(color.FgHiBlack, color.Bold, color.BgGreen).SprintFunc()
-		yellow := color.New(color.FgYellow, color.Bold).SprintFunc()
-
-		if opt == 1 {
-			groups := utils.GetGroupsToSend()
-			for _, group := range groups {
-				utils.SendMessage(client, group.JID)
-				fmt.Printf(" %s "+group.Name+"\n", c(" Send message to: "))
-			}
-			fmt.Printf("\n\n%s press %s to exit.", green(" Messages sent successfully! "),
-				yellow("Ctrl+C"))
-		}
-		if opt == 2 {
-			utils.GetGroup(client)
-		}
-	}
-
-	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
-
-	client.Disconnect()
-}
-
 func main() {
-	cmd := exec.Command("cmd", "/c", "cls")
-	cmd.Stdout = os.Stdout
-	err := cmd.Run()
+	groups := flag.Bool("groups", false, "Lista de todos lo grupos de WhatsApp")
+	c15 := flag.Bool("c15", false, "Envia mensaje para cobrarle a los clientes del dia 15")
+	c15r := flag.Bool("c15r", false, "Envia mensaje para recordarle a los clientes del dia 15 que deben pagar")
+	c25 := flag.Bool("c25", false, "Envia mensaje para cobrarle a los clientes del dia 25")
+	c25r := flag.Bool("c25r", false, "Envia mensaje para recordarle a los clientes del dia 25 que deben pagar")
 
-	if err != nil {
-		return
+	flag.Usage = func() {
+		_, err := fmt.Fprintln(os.Stderr, "Options:")
+		if err != nil {
+			return
+		}
+		flag.VisitAll(func(f *flag.Flag) {
+			utils.PrintFlag(f.Name, f.Usage)
+		})
 	}
 
-	c := color.New(color.FgHiBlack, color.Bold).Add(color.BgWhite)
-	cm := color.New(color.FgWhite, color.Bold).Add(color.BgWhite)
-	yellow := color.New(color.FgYellow, color.Bold).SprintFunc()
-	underline := color.New(color.Underline, color.Bold).SprintFunc()
+	flag.Parse()
 
-	cm.Println("\n    Welcome to Wabot - Go version    ")
-	c.Println("    Welcome to Wabot - Go version    ")
-	cm.Println("    Welcome to Wabot - Go version    ")
-
-	fmt.Printf("  %s mendoza000\n\n", yellow("Developed by:"))
-
-	fmt.Println("  Select your option:")
-
-	fmt.Printf("  %s Send messages\n", yellow("1."))
-	fmt.Printf("  %s Get groups\n\n", yellow("2."))
-
-	var opcion int
-	fmt.Printf("  %s ", underline("Type the number of your option:"))
-
-	_, err = fmt.Scanln(&opcion)
-	if err != nil {
-		fmt.Println("Error al leer la opción")
+	if flag.NFlag() == 0 {
+		color.Red("\nError: No flag provided.\n\n")
+		flag.Usage()
+		os.Exit(1)
 	}
 
-	switch opcion {
-	case 1:
-		connectClient(1)
-		break
-	case 2:
-		connectClient(2)
-		break
-	default:
-		fmt.Println("Opción inválida")
+	if *groups {
+		color.Green("\nGetting groups...\n\n")
+		client.ConnectClient(1)
+	}
+
+	if *c15 {
+		color.Green("Sending messages of 15h clients...\n")
+		client.ConnectClient(2)
+	}
+
+	if *c15r {
+		color.Yellow("Sending remember messages of 15th clients...\n")
+		client.ConnectClient(3)
+	}
+
+	if *c25 {
+		color.Green("Sending messages of 25th clients...\n")
+		client.ConnectClient(4)
+	}
+
+	if *c25r {
+		color.Yellow("Sending remember messages of 25th clients...\n")
+		client.ConnectClient(5)
 	}
 }
